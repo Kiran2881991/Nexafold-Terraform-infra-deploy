@@ -1,0 +1,202 @@
+name: $(Build.DefinitionName)_$(Build.SourceBranchName)_$(date:yyyyMMdd)$(rev:.r)
+
+trigger: none
+
+pr: none
+
+# Make templates available to the pipeline
+resources:
+  repositories:
+    - repository: pipeline_templates
+      type: git
+      name: Escape V2/pipeline-templates
+      ref: main
+
+# Pool selection for Azure Pipeline run
+pool:
+  name: "Azure Pipelines"
+  vmImage: "ubuntu-22.04"
+
+# Parameters - specified at run time
+parameters:
+  - name: environment
+    displayName: "Target Environment"
+    type: string
+    values:
+    - dev
+    - uat
+    - prod
+    default: dev
+
+ # Action to perform
+  - name: job
+    displayName: "Target Environment"
+    type: string
+    values:
+    - plan
+    - apply
+    - destroyPlan
+    - destroy
+    default: plan
+
+  - name: location
+    displayName: "Deployment Location"
+    type: string
+    values:
+    - francecentral
+    - francesouth
+    default: francecentral
+
+variables:
+  - name: azureServiceConnection
+    ${{ if eq(parameters.environment, 'prod') }}:
+      value: WTW-CRBATMO-PROD
+    ${{ elseif in(parameters.environment, 'dev') }}:
+      value: WTW-CRBATMO-DEV
+    ${{ elseif in(parameters.environment, 'uat') }}:
+      value: WTW-CRBATMO-UAT  
+
+  - name: appId
+    value: 006525
+
+  - name: applicationId
+    value: "esp"
+
+  - name: businessUnit
+    value: crbatmo
+
+  - name: terraformWorkingDirectory
+    value: $(System.DefaultWorkingDirectory)/terraform
+
+  - name: job
+    value: ${{ parameters.job }}
+
+  - name: location
+    value: francecentral  # Set location globally for all environments
+
+  - name: locationShortForm
+    value: fc  # Short form for francecentral
+
+  - name: environmentSingleChar
+    ${{ if eq(parameters.environment, 'dev') }}:
+      value: d
+    ${{ if eq(parameters.environment, 'uat') }}:
+      value: u
+    ${{ if eq(parameters.environment, 'prod') }}:
+      value: p
+
+  - name: stateResourceGroupName
+    ${{ if eq(parameters.environment, 'prod') }}:
+      value: "crbatmo-esp-p-em28-rgrp"
+    ${{ if eq(parameters.environment, 'dev') }}:
+      value: "crbatmo-esp-d-em28-cnfgrp"
+    ${{ if eq(parameters.environment, 'uat') }}:
+      value: "crbatmo-esp-u-em28-rgrp"
+
+  - name: stateStorageAccountName
+    value: '${{ variables.businessUnit }}${{ variables.applicationId }}${{ variables.environmentSingleChar }}tfst001'
+
+  - name: stateStorageContainerName
+    value: "commonnetworktfstate"
+
+  - name: rgName
+    ${{ if eq(parameters.environment, 'prod') }}:
+      value: "crbatmo-esp-p-em28-rgrp"
+    ${{ if eq(parameters.environment, 'dev') }}:
+      value: "crbatmo-esp-d-em28-rgrp"
+    ${{ if eq(parameters.environment, 'uat') }}:
+      value: "crbatmo-esp-u-em28-rgrp"
+
+  - name: vnet_name
+    ${{ if eq(parameters.environment, 'prod') }}:
+      value: "crbatmo-esp-p-em28-vnet"
+    ${{ if eq(parameters.environment, 'dev') }}:
+      value: "crbatmo-esp-d-em28-vnet"
+    ${{ if eq(parameters.environment, 'uat') }}:
+      value: "crbatmo-esp-u-em28-vnet"
+
+  - name: vnet_address_space
+    ${{ if eq(variables.vnet_name, 'crbatmo-esp-p-em28-vnet') }}:
+      value: "10.80.3.0/24"
+    ${{ if eq(variables.vnet_name, 'crbatmo-esp-d-em28-vnet') }}:
+      value: "10.80.1.0/24"
+    ${{ if eq(variables.vnet_name, 'crbatmo-esp-u-em28-vnet') }}:
+      value: "10.80.2.0/24"    
+
+  - name: stateFileName
+    value: '${{ variables.applicationId }}-${{ parameters.environment }}-${{ variables.location }}-commonnetwork.tfstate'
+
+  - name: runPublishPlan
+    value: True
+  - name: businessUnit
+    value: crbatmo
+
+stages:
+#####################
+#  Apply Workflows  #
+#####################
+
+- ${{ if in(variables['job'], 'plan', 'apply') }}:
+  - template: stages/terraform_plan_workflow.yml@pipeline_templates
+    parameters:
+      appID: ${{ variables.appID }}
+      applicationId: ${{ variables.applicationId }}
+      azureServiceConnection: ${{ variables.azureServiceConnection }}
+      environment: ${{ parameters.environment }}
+      location: ${{ variables.location }}
+      stateFileName: ${{ variables.stateFileName }}
+      stateResourceGroupName: ${{ variables.stateResourceGroupName }}
+      stateStorageAccountName: ${{ variables.stateStorageAccountName }}
+      stateStorageContainerName: ${{ variables.stateStorageContainerName }}
+      terraformWorkingDirectory: ${{ variables.terraformWorkingDirectory }}
+      rgName: ${{ variables.rgName }}
+
+- ${{ if eq(variables['job'], 'apply') }}:
+  - template: stages/terraform_apply_workflow.yml@pipeline_templates
+    parameters:
+      appID: ${{ variables.appID }}
+      applicationId: ${{ variables.applicationId }}
+      azureServiceConnection: ${{ variables.azureServiceConnection }}
+      environment: ${{ parameters.environment }}
+      location: ${{ variables.location }}
+      stateFileName: ${{ variables.stateFileName }}
+      stateResourceGroupName: ${{ variables.stateResourceGroupName }}
+      stateStorageAccountName: ${{ variables.stateStorageAccountName }}
+      stateStorageContainerName: ${{ variables.stateStorageContainerName }}
+      terraformWorkingDirectory: ${{ variables.terraformWorkingDirectory }}
+      
+
+
+#####################
+# Destroy Workflows #
+#####################
+
+- ${{ if in(variables['job'], 'destroyPlan', 'destroy') }}:
+  - template: stages/terraform_plan_destroy_workflow.yml@pipeline_templates
+    parameters:
+      appID: ${{ variables.appID }}
+#      applicationId: ${{ variables.applicationId }}
+      azureServiceConnection: ${{ variables.azureServiceConnection }}
+      environment: ${{ parameters.environment }}
+      location: ${{ variables.location }}
+      stateFileName: ${{ variables.stateFileName }}
+      stateResourceGroupName: ${{ variables.stateResourceGroupName }}
+      stateStorageAccountName: ${{ variables.stateStorageAccountName }}
+      stateStorageContainerName: ${{ variables.stateStorageContainerName }}
+      terraformWorkingDirectory: ${{ variables.terraformWorkingDirectory }}
+      rgName: ${{ variables.rgName }}
+
+- ${{ if eq(variables['job'], 'destroy') }}:
+  - template: stages/terraform_apply_destroy_workflow.yml@pipeline_templates
+    parameters:
+      appID: ${{ variables.appID }}
+#      applicationId: ${{ variables.applicationId }}
+      azureServiceConnection: ${{ variables.azureServiceConnection }}
+      environment: ${{ parameters.environment }}
+      location: ${{ variables.location }}
+      stateFileName: ${{ variables.stateFileName }}
+      stateResourceGroupName: ${{ variables.stateResourceGroupName }}
+      stateStorageAccountName: ${{ variables.stateStorageAccountName }}
+      stateStorageContainerName: ${{ variables.stateStorageContainerName }}
+      terraformWorkingDirectory: ${{ variables.terraformWorkingDirectory }}
+      rgName: ${{ variables.rgName }}
