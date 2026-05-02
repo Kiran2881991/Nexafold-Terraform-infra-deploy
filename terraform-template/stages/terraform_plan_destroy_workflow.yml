@@ -1,0 +1,68 @@
+parameters:
+  - name: appID
+    type: string
+    default: 006525
+#  - name: applicationId
+#    type: string
+#    default: esp
+  - name: azureServiceConnection
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+  - name: environment
+    type: string
+    values:
+    - dev
+    - uat
+    - prod
+    default: dev
+  - name: location
+    type: string
+    default: francecentral
+  - name: stateStorageAccountName
+    type: string
+  - name: stateStorageContainerName
+    type: string
+  - name: stateFileName
+    type: string
+  - name: stateResourceGroupName
+    type: string
+#  - name: rgName
+#    type: string
+
+stages:
+  - stage: destroy_plan
+    displayName: 'Destroy_Plan'
+    jobs:
+    - job: 'Terraform_Destroy_Plan'
+      steps:
+      - template: ../tasks/terraform_git_setup.yml@pipeline_templates
+
+      - template: ../tasks/azure_service_connection.yml@pipeline_templates
+        parameters:
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+
+      - template: ../tasks/terraform_init.yml@pipeline_templates
+        parameters:
+#          applicationId: ${{ parameters.applicationId }}
+          appID: ${{ parameters.appID }}
+#          location: ${{ parameters.location }}
+          stateStorageAccountName: ${{ parameters.stateStorageAccountName }}
+          stateStorageContainerName: ${{ parameters.stateStorageContainerName }}
+          stateFileName: ${{ parameters.stateFileName }}
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          stateResourceGroupName: ${{ parameters.stateResourceGroupName }}
+          terraformWorkingDirectory: ${{ parameters.terraformWorkingDirectory }}
+#          appResourceGroupName: ${{ variables.rgName }}
+#          rgName: ${{ variables.rgName }}
+#          environment: ${{ parameters.environment }}
+#          location: ${{ parameters.location }}
+
+      - template: ../tasks/terraform_plan_destroy.yml@pipeline_templates
+        parameters:
+#          appID: ${{ parameters.appID }}
+          azureServiceConnection: ${{ parameters.azureServiceConnection }}
+          terraformWorkingDirectory: ${{ parameters.terraformWorkingDirectory }}
+          environment: ${{ parameters.environment }}
+          location: ${{ parameters.location }}
+#          rgName: ${{ variables.rgName }}

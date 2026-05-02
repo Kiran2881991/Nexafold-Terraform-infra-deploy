@@ -1,0 +1,68 @@
+parameters:
+  - name: appID
+    type: string
+#  - name: applicationId
+#    type: string
+#    default: esp
+  - name: azureServiceConnection
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+  - name: stateStorageAccountName
+    type: string
+  - name: stateStorageContainerName
+    type: string
+  - name: environment
+    type: string
+    values:
+    - dev
+    - uat
+    - prod
+    default: dev
+  - name: stateFileName
+    type: string
+  - name: location
+    type: string
+  - name: stateResourceGroupName
+    type: string
+#  - name: rgName
+#    type: string
+
+stages:
+  - stage: apply
+    displayName: Apply
+    jobs:
+    - deployment: terraform_apply
+      displayName: 'Terraform_Apply'
+      # TODO - Align environment names with parameter values for deployment
+      environment: ${{ parameters.environment }}
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - checkout: self
+
+            - template: ../tasks/terraform_git_setup.yml@pipeline_templates
+        
+            - template: ../tasks/azure_service_connection.yml@pipeline_templates
+              parameters:
+                azureServiceConnection: ${{ parameters.azureServiceConnection }}
+
+            - template: ../tasks/terraform_init.yml@pipeline_templates
+              parameters:
+                appID: ${{ parameters.appID }}
+#                stateLocation: ${{ parameters.location }}
+#                location: ${{ parameters.location }}
+                stateStorageAccountName: ${{ parameters.stateStorageAccountName }}
+                stateStorageContainerName: ${{ parameters.stateStorageContainerName }}
+                stateFileName: ${{ parameters.stateFileName }}
+                azureServiceConnection: ${{ parameters.azureServiceConnection }}
+                stateResourceGroupName: ${{ parameters.stateResourceGroupName }}
+                terraformWorkingDirectory: ${{ parameters.terraformWorkingDirectory }}
+#                rgName: ${{ variables.rgName }}              
+
+            - template: ../tasks/terraform_apply.yml@pipeline_templates
+              parameters:
+                azureServiceConnection: ${{ parameters.azureServiceConnection }}
+                terraformWorkingDirectory: ${{ parameters.terraformWorkingDirectory }}
+#                rgName: ${{ variables.rgName }}
