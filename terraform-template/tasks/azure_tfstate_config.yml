@@ -1,0 +1,84 @@
+parameters:
+  - name: appID
+    type: string
+#  - name: applicationId
+#    type: string
+#    default: esp
+  - name: stateStorageAccountName
+    type: string
+  - name: stateStorageContainerName
+    type: string
+  - name: stateFileName
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+  - name: stateLocation 
+    type: string
+    values: 
+    - francecentral
+    - francesouth
+    default: francecentral
+  - name: stateResourceGroupName
+    type: string
+  - name: azureServiceConnection
+    type: string
+#  - name: rgName
+#    type: string
+
+
+steps:
+  - task: AzureCLI@2
+    displayName: "Ensure Terraform State Resource Group and Storage Account Exist"
+    inputs:
+      azureSubscription: $(azureServiceConnection)
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        LOCATION="francecentral"
+
+        echo "Checking if resource group '$STATE_RESOURCE_GROUP_NAME' exists..."
+        if ! az group show --name "$STATE_RESOURCE_GROUP_NAME" &> /dev/null; then
+          echo "Creating resource group '$STATE_RESOURCE_GROUP_NAME' in $LOCATION..."
+          az group create --name "$STATE_RESOURCE_GROUP_NAME" --location "$LOCATION" || { echo "Failed to create resource group"; exit 1; }
+        else
+          echo "Resource group '$STATE_RESOURCE_GROUP_NAME' already exists."
+        fi
+
+        echo "Checking if storage account '$STATE_STORAGE_ACCOUNT_NAME' exists..."
+        if ! az storage account show --name "$STATE_STORAGE_ACCOUNT_NAME" --resource-group "$STATE_RESOURCE_GROUP_NAME" &> /dev/null; then
+          echo "Creating storage account '$STATE_STORAGE_ACCOUNT_NAME' in $LOCATION..."
+          az storage account create \
+            --name "$STATE_STORAGE_ACCOUNT_NAME" \
+            --resource-group "$STATE_RESOURCE_GROUP_NAME" \
+            --location "$LOCATION" \
+            --sku Standard_RAGRS \
+            --kind StorageV2 \
+            --encryption-services blob \
+            --access-tier hot \
+            --allow-blob-public-access false \
+            --https-only true \
+            --min-tls-version TLS1_2 \
+            --allow-cross-tenant-replication false || { echo "Failed to create storage account"; exit 1; }
+        else
+          echo "Storage account '$STATE_STORAGE_ACCOUNT_NAME' already exists."
+        fi
+
+        echo "Validating storage account creation..."
+        if ! az storage account show --name "$STATE_STORAGE_ACCOUNT_NAME" --resource-group "$STATE_RESOURCE_GROUP_NAME" &> /dev/null; then
+          echo "Storage account '$STATE_STORAGE_ACCOUNT_NAME' still not found after creation attempt. Exiting."
+          exit 1
+        fi
+
+        echo "Checking if container '$STATE_STORAGE_CONTAINER_NAME' exists..."
+        accountKey=$(az storage account keys list --account-name "$STATE_STORAGE_ACCOUNT_NAME" --resource-group "$STATE_RESOURCE_GROUP_NAME" --query '[0].value' -o tsv) || { echo "Failed to retrieve account key"; exit 1; }
+
+        if ! az storage container show --name "$STATE_STORAGE_CONTAINER_NAME" --account-name "$STATE_STORAGE_ACCOUNT_NAME" --account-key "$accountKey" &> /dev/null; then
+          echo "Creating container '$STATE_STORAGE_CONTAINER_NAME'..."
+          az storage container create --name "$STATE_STORAGE_CONTAINER_NAME" --account-name "$STATE_STORAGE_ACCOUNT_NAME" --account-key "$accountKey" || { echo "Failed to create container"; exit 1; }
+        else
+          echo "Container '$STATE_STORAGE_CONTAINER_NAME' already exists."
+        fi
+    env:
+      STATE_RESOURCE_GROUP_NAME: $(stateResourceGroupName)
+      STATE_STORAGE_ACCOUNT_NAME: $(stateStorageAccountName)
+      STATE_STORAGE_CONTAINER_NAME: $(stateStorageContainerName)

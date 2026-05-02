@@ -1,0 +1,28 @@
+parameters:
+#  - name: applicationId
+#    type: string
+#    default: esp
+  - name: azureServiceConnection
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+  - name: environment
+    type: string
+    values:
+    - dev
+    - uat
+    - prod
+    default: dev
+
+
+steps:
+  - download: current
+    artifact: terraform_plan_destroy
+
+  - task: TerraformCLI@1
+    displayName: 'Terraform Destroy Apply'
+    inputs:
+      command: apply
+      workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+      environmentServiceName: ${{ parameters.azureServiceConnection }}
+      commandOptions: '-destroy $(Pipeline.Workspace)/terraform_plan_destroy/out.tfplan'

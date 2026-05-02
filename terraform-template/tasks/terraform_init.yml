@@ -1,0 +1,106 @@
+parameters:
+  - name: appID
+    type: string
+#  - name: applicationId
+#    type: string
+  - name: stateStorageAccountName
+    type: string
+  - name: stateStorageContainerName
+    type: string
+  - name: stateFileName
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+  - name: stateLocation 
+    type: string
+    values: 
+    - francecentral
+    - francesouth
+    default: francecentral
+  - name: stateResourceGroupName
+    type: string
+  - name: azureServiceConnection
+    type: string
+#  - name: rgName
+#    type: string
+
+steps:
+# Step 1: Install Terraform v1.14.5 (fully qualified name)
+- task: JasonBJohnson.azure-pipelines-tasks-terraform.azure-pipelines-tasks-terraform-installer.TerraformInstaller@1
+  displayName: "Install Terraform v1.14.5"
+  inputs:
+    terraformVersion: '1.14.5'
+
+# Do the upgrade: refresh provider selections in the lock file
+- script: |
+    echo "Terraform version:"; terraform version
+    echo "Upgrading provider selections (rewriting .terraform.lock.hcl)..."
+    terraform init -upgrade \
+      -backend-config="resource_group_name=$(stateResourceGroupName)" \
+      -backend-config="storage_account_name=$(stateStorageAccountName)" \
+      -backend-config="container_name=$(stateStorageContainerName)" \
+      -backend-config="key=$(stateFileName)"
+    echo "Selected providers:"; terraform providers
+  displayName: "Terraform init -upgrade (refresh lock file)"
+  workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+  env:
+    ARM_CLIENT_ID:        $(ARM_CLIENT_ID)
+    ARM_CLIENT_SECRET:    $(ARM_CLIENT_SECRET)
+    ARM_SUBSCRIPTION_ID:  $(ARM_SUBSCRIPTION_ID)
+    ARM_TENANT_ID:        $(ARM_TENANT_ID)
+
+# (Optional) publish the updated lock file so you can commit it afterwards
+#- task: PublishBuildArtifacts@1
+#  displayName: "Publish lock file artifact"
+#  inputs:
+#    pathToPublish: '$(System.DefaultWorkingDirectory)/Infra-deployment/common-terraform-networking/.terraform.lock.hcl'
+#    artifactName: 'terraform-lock'
+
+# Step 2: Terraform Init (Manual)
+- script: |
+    echo "Terraform version:"
+    terraform version
+
+    echo "Running terraform init..."
+    terraform init \
+      -backend-config="resource_group_name=${STATE_RG}" \
+      -backend-config="storage_account_name=${STATE_SA}" \
+      -backend-config="container_name=${STATE_CONTAINER}" \
+      -backend-config="key=${STATE_FILE}"
+  displayName: "Terraform Init (Manual)"
+  workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+  env:
+    ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+    ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+    ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+    ARM_TENANT_ID: $(ARM_TENANT_ID)
+    STATE_RG: ${{ parameters.stateResourceGroupName }}
+    STATE_SA: ${{ parameters.stateStorageAccountName }}
+    STATE_CONTAINER: ${{ parameters.stateStorageContainerName }}
+    STATE_FILE: ${{ parameters.stateFileName }}
+
+#steps:
+# Step 1: Install Terraform v1.13.1
+#- task: JasonBJohnson.azure-pipelines-tasks-terraform.azure-pipelines-tasks-terraform-installer.TerraformInstaller@0
+#  displayName: "Install Terraform v1.13.1"
+#  inputs:
+#    terraformVersion: '1.13.1'
+
+# Step 2: Manually run terraform init
+#- script: |
+#    echo "Terraform version:"
+#    terraform version
+
+#    echo "Running terraform init..."
+#    terraform init \
+#      -backend-config="resource_group_name=${{ parameters.stateResourceGroupName }}" \
+#      -backend-config="storage_account_name=${{ parameters.stateStorageAccountName }}" \
+#      -backend-config="container_name=${{ parameters.stateStorageContainerName }}" \
+#      -backend-config="key=${{ parameters.stateFileName }}"
+#  displayName: "Terraform Init (Manual)"
+#  workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+#  env:
+#    ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+#    ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+#    ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+#    ARM_TENANT_ID: $(ARM_TENANT_ID)

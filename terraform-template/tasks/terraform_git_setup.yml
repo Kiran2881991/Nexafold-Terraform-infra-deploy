@@ -1,0 +1,16 @@
+steps:
+  - task: Bash@3
+    displayName: Configure Git with Pipeline Credentials
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Validate that PAT_TOKEN is set
+        if [ -z "$PAT_TOKEN" ]; then
+          echo "Error: PAT_TOKEN is not set. Ensure it is defined in the variable group Escape_V2_CRBATMO-Dev."
+          exit 1
+        fi
+
+        # Configure Git to use the PAT token for the organization
+        git config --global url."https://$PAT_TOKEN@dev.azure.com".insteadOf "https://wtwcrb@dev.azure.com"
+    env:
+      PAT_TOKEN: $(PAT_TOKEN)  # Securely passed from the variable group

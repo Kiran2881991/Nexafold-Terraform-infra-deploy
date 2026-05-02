@@ -1,0 +1,37 @@
+parameters:
+#  - name: applicationId
+#    type: string
+#    default: esp
+  - name: azureServiceConnection
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+  - name: environment
+    type: string
+    values:
+    - dev
+    - uat
+    - prod
+    default: dev
+  - name: location
+    type: string
+#  - name: rgName
+#    type: string  
+
+steps:
+  - task: TerraformCLI@1
+    displayName: 'Terraform Destroy Plan'
+    inputs:
+      command: plan
+      workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+      environmentServiceName: ${{ parameters.azureServiceConnection }}
+      publishPlanResults: 'tf_destroy_plan'
+      commandOptions: '-destroy --var-file ./vars/${{ parameters.environment }}.tfvars -input=false -out=$(System.DefaultWorkingDirectory)/out.tfplan'
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Terraform Destroy Plan'
+    condition: eq(variables.runPublishPlan,True)
+    inputs:
+      targetPath: '$(System.DefaultWorkingDirectory)/out.tfplan'
+      publishLocation: pipeline
+      artifact: terraform_plan_destroy

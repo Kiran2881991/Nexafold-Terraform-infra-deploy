@@ -1,0 +1,27 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: terraformWorkingDirectory
+    type: string
+
+steps:
+  - download: current
+    artifact: terraform_plan
+
+  - task: TerraformCLI@1
+    displayName: 'Terraform Apply'
+    inputs:
+      command: apply
+      workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+      environmentServiceName: ${{ parameters.azureServiceConnection }}
+      commandOptions: '$(Pipeline.Workspace)/terraform_plan/out.tfplan'
+
+#  - task: TerraformCLI@1
+#    displayName: 'Terraform Apply (Add Only ACR + Private Endpoint)'
+#    inputs:
+#      command: apply
+#      workingDirectory: ${{ parameters.terraformWorkingDirectory }}
+#      environmentServiceName: ${{ parameters.azureServiceConnection }}
+#      commandOptions: >
+#        -target=azurerm_container_registry.crbatmophpdem28acr
+#        -target=azurerm_private_endpoint.pe_crbatmophpdem28acr
