@@ -1,0 +1,8 @@
+parameters:
+  environment: uat
+  azureServiceConnection: WTW-CRBATMO-UAT
+  stateResourceGroupName: crbatmo-esp-u-em28-cnfgrp
+  stateStorageAccountName: crbatmoesptfsu001
+  stateStorageContainerName: tfstate
+  stateLocation: francecentral
+  subscriptionName: WTW-CRBATMO-UAT

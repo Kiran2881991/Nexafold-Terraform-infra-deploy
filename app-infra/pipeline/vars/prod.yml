@@ -1,0 +1,8 @@
+parameters:
+  environment: prod
+  azureServiceConnection: WTW-CRBATMO-PROD
+  stateResourceGroupName: crbatmo-esp-p-em28-cnfgrp
+  stateStorageAccountName: crbatmoesptfsp001
+  stateStorageContainerName: tfstate
+  stateLocation: francecentral
+  subscriptionName: WTW-CRBATMO-PROD
